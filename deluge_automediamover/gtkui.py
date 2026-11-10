@@ -87,6 +87,30 @@ class GtkUI(Gtk3PluginBase):
         grid.attach(self.chk_movie_sub, 0, 0, 2, 1)
         box.pack_start(frame, False, False, 0)
 
+        # --- Ignorare
+        frame = Gtk.Frame(shadow_type=Gtk.ShadowType.NONE)
+        frame.set_label_widget(Gtk.Label(label='<b>Ignore</b>', use_markup=True))
+        grid = Gtk.Grid(row_spacing=5, column_spacing=5, margin=5)
+        frame.add(grid)
+        self.chk_skip_inside = Gtk.CheckButton(
+            label='Ignore torrents already downloading inside the Movies / TV series folders'
+        )
+        grid.attach(self.chk_skip_inside, 0, 0, 2, 1)
+        grid.attach(Gtk.Label(label='Ignore labels containing:', xalign=0), 0, 1, 1, 1)
+        self.entry_skip_labels = Gtk.Entry(hexpand=True)
+        self.entry_skip_labels.set_tooltip_text(
+            'Comma separated keywords, e.g. "radarr, sonarr". A label like "tv-sonarr" matches "sonarr". '
+            'Needs the Label plugin. Leave empty to disable.'
+        )
+        grid.attach(self.entry_skip_labels, 1, 1, 1, 1)
+        grid.attach(Gtk.Label(label='Ignore download folders:', xalign=0), 0, 2, 1, 1)
+        self.entry_skip_paths = Gtk.Entry(hexpand=True)
+        self.entry_skip_paths.set_tooltip_text(
+            'Extra folders separated by ";". Torrents downloading inside them are never moved.'
+        )
+        grid.attach(self.entry_skip_paths, 1, 2, 1, 1)
+        box.pack_start(frame, False, False, 0)
+
         # --- Avansat
         frame = Gtk.Frame(shadow_type=Gtk.ShadowType.NONE)
         frame.set_label_widget(Gtk.Label(label='<b>Advanced</b>', use_markup=True))
@@ -156,8 +180,12 @@ class GtkUI(Gtk3PluginBase):
 
     def _on_process_all(self, *args):
         def on_done(results):
-            moved = [r for r in results if r.get('moved')]
-            self.lbl_test.set_text('%d torrent(s) moved out of %d finished.' % (len(moved), len(results)))
+            moved = len([r for r in results if r.get('moved')])
+            skipped = len([r for r in results if r.get('skipped')])
+            self.lbl_test.set_text(
+                '%d moved, %d ignored, %d unchanged (of %d torrents).'
+                % (moved, skipped, len(results) - moved - skipped, len(results))
+            )
 
         client.automediamover.set_config(self._collect()).addCallback(
             lambda _: client.automediamover.process_all_completed().addCallback(on_done)
@@ -173,6 +201,9 @@ class GtkUI(Gtk3PluginBase):
             'strip_year_from_show': self.chk_strip_year.get_active(),
             'movie_subfolder': self.chk_movie_sub.get_active(),
             'video_extensions': self.entry_ext.get_text().strip(),
+            'skip_inside_media_folders': self.chk_skip_inside.get_active(),
+            'skip_labels': self.entry_skip_labels.get_text().strip(),
+            'skip_paths': self.entry_skip_paths.get_text().strip(),
         }
 
     def on_apply_prefs(self):
@@ -193,5 +224,8 @@ class GtkUI(Gtk3PluginBase):
             self.chk_strip_year.set_active(config['strip_year_from_show'])
             self.chk_movie_sub.set_active(config['movie_subfolder'])
             self.entry_ext.set_text(config['video_extensions'])
+            self.chk_skip_inside.set_active(config.get('skip_inside_media_folders', True))
+            self.entry_skip_labels.set_text(config.get('skip_labels', ''))
+            self.entry_skip_paths.set_text(config.get('skip_paths', ''))
 
         client.automediamover.get_config().addCallback(on_get_config)

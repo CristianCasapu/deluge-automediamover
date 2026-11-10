@@ -9,6 +9,13 @@ Detectează automat dacă un torrent terminat este **film** sau **serial** și �
 | Film | `<Folder filme>/` sau `<Folder filme>/<Titlu (An)>/` (opțional) |
 | Altceva (fără fișiere video) | nu se atinge |
 
+## Ce NU atinge
+
+- **Torrente care încă se descarcă** (sau sunt în Checking / Moving / Error). Mutarea se face doar după ce download-ul s-a terminat.
+- **Torrente care se descarcă deja în folderul de filme sau seriale** (sau în orice subfolder al lor). Opțiunea e activă implicit.
+- **Torrente cu o etichetă de la Radarr / Sonarr / Lidarr / Readarr / Whisparr**: dacă eticheta *conține* unul din cuvintele cheie (de ex. `tv-sonarr`, `radarr-4k`), torrentul e ignorat, pentru că aplicațiile acelea își mută singure fișierele. Lista e configurabilă; trebuie să ai activat pluginul **Label** din Deluge.
+- **Alte foldere de download** pe care le adaugi tu (separate prin `;`).
+
 Funcționează pe **Windows** și **Linux** (căi normalizate, nume de foldere curățate de caractere invalide pe Windows) și se configurează din **clientul GTK** și din **interfața Web** (Preferences → AutoMediaMover).
 
 ## Cum detectează un serial
@@ -35,6 +42,9 @@ Dacă nu se potrivește niciun tipar și există fișiere video, e considerat fi
 | Season folder format | `Season {season:02d}` | format Python, ex. `Sezonul {season}` |
 | Remove year from series name | nu | `Doctor Who (2005)` → `Doctor Who` |
 | Create "Title (Year)" sub-folder | nu | un folder per film |
+| Ignore torrents already downloading inside the Movies / TV series folders | da | nu muta ce se descarcă deja acolo |
+| Ignore labels containing | `radarr, sonarr, lidarr, readarr, whisparr` | cuvinte cheie separate prin virgulă; gol = dezactivat |
+| Ignore download folders | gol | foldere suplimentare ignorate, separate prin `;` |
 | Video extensions | mkv, mp4, avi, … | extensiile considerate video |
 | Test a name | — | arată ce ar face pluginul cu un nume dat |
 | Process all completed torrents now | — | aplică regulile pe torrentele deja terminate |
@@ -48,7 +58,7 @@ Egg-ul trebuie să aibă aceeași versiune de Python ca Deluge (Deluge 2.2.0 pe 
 **Windows**
 
 ```powershell
-.\build.ps1 -Install          # construiește dist\AutoMediaMover-1.1-py3.9.egg și îl copiază în %APPDATA%\deluge\plugins
+.\build.ps1 -Install          # construiește dist\AutoMediaMover-1.2-py3.9.egg și îl copiază în %APPDATA%\deluge\plugins
 ```
 
 **Linux**
@@ -65,6 +75,7 @@ Pentru Web UI, pluginul trebuie activat din Web UI (Preferences → Plugins) sau
 
 ```bash
 python tests/test_detector.py
+python tests/test_rules.py
 ```
 
 ## Licență

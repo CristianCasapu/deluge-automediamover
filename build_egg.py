@@ -12,7 +12,7 @@ import sys
 import zipfile
 
 NAME = 'AutoMediaMover'
-VERSION = '1.1'
+VERSION = '1.2'
 PACKAGE = 'deluge_' + NAME.lower()
 SUMMARY = 'Moves finished downloads to a Movies or TV Series/<Show>/ folder automatically'
 

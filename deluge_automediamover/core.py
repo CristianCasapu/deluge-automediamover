@@ -4,12 +4,14 @@
 import logging
 import os
 
+from twisted.internet import reactor
+
 import deluge.component as component
 import deluge.configmanager
 from deluge.core.rpcserver import export
 from deluge.plugins.pluginbase import CorePluginBase
 
-from . import detector
+from . import detector, rules
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +24,20 @@ DEFAULT_PREFS = {
     'movie_subfolder': False,
     'strip_year_from_show': False,
     'video_extensions': detector.DEFAULT_VIDEO_EXTENSIONS,
+    # --- reguli de ignorare
+    # torrentul se descarca deja in folderul de filme / seriale -> nu-l mutam
+    'skip_inside_media_folders': True,
+    # etichete (Label plugin) care contin unul din aceste cuvinte -> ignorate (Radarr/Sonarr muta singure)
+    'skip_labels': rules.DEFAULT_SKIP_LABELS,
+    # alte foldere de download ignorate, separate prin ';'
+    'skip_paths': '',
 }
+
+# stari in care nu atingem torrentul (pe langa "nu e terminat")
+_BUSY_STATES = ('Downloading', 'Checking', 'Allocating', 'Moving', 'Error')
+# secunde de asteptare dupa TorrentFinishedEvent, ca Deluge sa-si actualizeze starea
+_FINISHED_DELAY = 3
+_MAX_RETRIES = 5
 
 
 def _same_path(a, b):
@@ -52,7 +67,20 @@ class Core(CorePluginBase):
     def _on_torrent_finished(self, torrent_id):
         if not self.config['enabled']:
             return
+        reactor.callLater(_FINISHED_DELAY, self._process_when_ready, torrent_id, 0)
+
+    def _process_when_ready(self, torrent_id, attempt):
+        if not self.config['enabled']:
+            return
+        tm = component.get('TorrentManager')
+        if torrent_id not in tm.torrents:
+            return
         try:
+            status = tm[torrent_id].get_status(['is_finished', 'state'])
+            # inca se verifica / muta -> mai asteptam putin
+            if status['state'] in ('Checking', 'Allocating', 'Moving') and attempt < _MAX_RETRIES:
+                reactor.callLater(_FINISHED_DELAY, self._process_when_ready, torrent_id, attempt + 1)
+                return
             self._process(torrent_id)
         except Exception:
             log.exception('AutoMediaMover: error processing torrent %s', torrent_id)
@@ -76,10 +104,48 @@ class Core(CorePluginBase):
             movie_subfolder=self.config['movie_subfolder'],
         )
 
+    def _get_label(self, torrent_id):
+        """Eticheta din Label plugin ('' daca pluginul nu e activ)."""
+        try:
+            plugin = component.get('CorePlugin.Label')
+            label = plugin.torrent_labels.get(torrent_id)
+            if label is not None:
+                return label
+        except Exception:
+            pass
+        try:
+            return component.get('Core').get_torrent_status(torrent_id, ['label']).get('label') or ''
+        except Exception:
+            return ''
+
+    def _skip_reason(self, torrent_id, status):
+        """Motivul pentru care torrentul NU trebuie atins, sau None."""
+        if not status.get('is_finished') or status.get('state') in _BUSY_STATES:
+            return 'not finished (state: %s)' % status.get('state')
+
+        keyword = rules.matching_label_keyword(self._get_label(torrent_id), self.config['skip_labels'])
+        if keyword:
+            return 'label matches "%s" (managed by another app)' % keyword
+
+        save_path = status.get('save_path') or ''
+        folders = rules.split_paths(self.config['skip_paths'])
+        if self.config['skip_inside_media_folders']:
+            folders = [self.config['movies_path'], self.config['tv_path']] + folders
+        folder = rules.matching_folder(save_path, folders)
+        if folder:
+            return 'already downloading inside "%s"' % folder
+        return None
+
     def _process(self, torrent_id):
         torrent = component.get('TorrentManager')[torrent_id]
-        status = torrent.get_status(['name', 'files', 'save_path', 'is_finished'])
+        status = torrent.get_status(['name', 'files', 'save_path', 'is_finished', 'state'])
         name = status['name']
+
+        reason = self._skip_reason(torrent_id, status)
+        if reason:
+            log.info('AutoMediaMover: ignoring "%s": %s', name, reason)
+            return {'torrent_id': torrent_id, 'name': name, 'moved': False, 'skipped': True, 'message': reason}
+
         detection = self._detect(name, status.get('files') or [])
         dest = self._destination(detection)
         log.info('AutoMediaMover: "%s" detected as %s', name, detection)
@@ -134,8 +200,6 @@ class Core(CorePluginBase):
         tm = component.get('TorrentManager')
         for torrent_id in torrent_ids:
             if torrent_id not in tm.torrents:
-                continue
-            if not tm[torrent_id].get_status(['is_finished'])['is_finished']:
                 continue
             try:
                 results.append(self._process(torrent_id))

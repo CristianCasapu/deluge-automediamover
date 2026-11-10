@@ -96,6 +96,35 @@ Deluge.ux.preferences.AutoMediaMoverPage = Ext.extend(Ext.Panel, {
             boxLabel: _('Create "Title (Year)" sub-folder for each movie'),
         });
 
+        // --- Ignorare
+        fs = this.form.add({
+            xtype: 'fieldset',
+            border: false,
+            title: _('Ignore'),
+            autoHeight: true,
+            labelAlign: 'top',
+            defaultType: 'textfield',
+        });
+        this.skip_inside = fs.add({
+            xtype: 'checkbox',
+            name: 'skip_inside_media_folders',
+            height: 22,
+            hideLabel: true,
+            boxLabel: _('Ignore torrents already downloading inside the Movies / TV series folders'),
+        });
+        this.skip_labels = fs.add({
+            fieldLabel: _('Ignore labels containing (comma separated, e.g. "radarr, sonarr"; needs the Label plugin; empty = off)'),
+            labelSeparator: '',
+            name: 'skip_labels',
+            width: '97%',
+        });
+        this.skip_paths = fs.add({
+            fieldLabel: _('Ignore download folders (separated by ";")'),
+            labelSeparator: '',
+            name: 'skip_paths',
+            width: '97%',
+        });
+
         // --- Avansat
         fs = this.form.add({
             xtype: 'fieldset',
@@ -165,6 +194,9 @@ Deluge.ux.preferences.AutoMediaMoverPage = Ext.extend(Ext.Panel, {
             strip_year_from_show: this.strip_year.getValue(),
             movie_subfolder: this.movie_subfolder.getValue(),
             video_extensions: this.video_extensions.getValue().trim(),
+            skip_inside_media_folders: this.skip_inside.getValue(),
+            skip_labels: this.skip_labels.getValue().trim(),
+            skip_paths: this.skip_paths.getValue().trim(),
         };
     },
 
@@ -204,12 +236,14 @@ Deluge.ux.preferences.AutoMediaMoverPage = Ext.extend(Ext.Panel, {
             success: function () {
                 deluge.client.automediamover.process_all_completed({
                     success: function (results) {
-                        var moved = 0;
+                        var moved = 0, skipped = 0;
                         Ext.each(results, function (r) {
                             if (r.moved) moved++;
+                            else if (r.skipped) skipped++;
                         });
-                        this.setResult(moved + ' ' + _('torrent(s) moved out of') + ' ' +
-                            results.length + ' ' + _('finished.'));
+                        this.setResult(moved + ' ' + _('moved') + ', ' + skipped + ' ' + _('ignored') + ', ' +
+                            (results.length - moved - skipped) + ' ' + _('unchanged') +
+                            ' (' + results.length + ' ' + _('torrents') + ').');
                     },
                     scope: this,
                 });
@@ -237,6 +271,9 @@ Deluge.ux.preferences.AutoMediaMoverPage = Ext.extend(Ext.Panel, {
                 this.strip_year.setValue(config['strip_year_from_show']);
                 this.movie_subfolder.setValue(config['movie_subfolder']);
                 this.video_extensions.setValue(config['video_extensions']);
+                this.skip_inside.setValue(config['skip_inside_media_folders'] !== false);
+                this.skip_labels.setValue(config['skip_labels'] || '');
+                this.skip_paths.setValue(config['skip_paths'] || '');
             },
             scope: this,
         });

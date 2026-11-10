@@ -8,7 +8,7 @@ from setuptools import find_packages, setup
 __plugin_name__ = 'AutoMediaMover'
 __author__ = 'CristianCasapu'
 __author_email__ = ''
-__version__ = '1.1'
+__version__ = '1.2'
 __url__ = 'https://github.com/CristianCasapu/deluge-automediamover'
 __license__ = 'GPLv3'
 __description__ = 'Moves finished downloads to a Movies or TV Series/<Show>/ folder automatically'
