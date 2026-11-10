@@ -74,8 +74,10 @@ _WINDOWS_RESERVED = {
 class Detection(object):
     """Rezultatul detectiei."""
 
-    def __init__(self, kind, title=None, season=None, year=None, reason=''):
+    def __init__(self, kind, title=None, season=None, year=None, reason='', is_pack=False):
         self.kind = kind
+        # True = sezon intreg / mai multe episoade, False = un singur episod
+        self.is_pack = is_pack
         self.title = title
         self.season = season
         self.year = year
@@ -88,6 +90,7 @@ class Detection(object):
             'season': self.season,
             'year': self.year,
             'reason': self.reason,
+            'is_pack': self.is_pack,
         }
 
     def __repr__(self):
@@ -181,13 +184,15 @@ def _season_from_match(m):
 
 
 def _tv_from_name(name, strip_year):
+    is_season = False
     m = _match_any(EPISODE_PATTERNS, name)
     if not m:
         m = _match_any(SEASON_PATTERNS, name)
+        is_season = True
     if not m:
         return None
     title = clean_title(name[: m.start()], strip_year)
-    return m, title
+    return m, title, is_season
 
 
 def _movie_title(name, strip_year):
@@ -233,24 +238,28 @@ def detect(name, files=None, video_extensions=DEFAULT_VIDEO_EXTENSIONS, strip_ye
 
     base_name = _strip_video_ext(name, extensions)
 
-    # 1. Numele torrentului contine un tipar de serial
-    found = _tv_from_name(base_name, strip_year_from_show)
-    if found:
-        m, title = found
-        season = _season_from_match(m)
-        if not title:
-            # ex. "Season 1" -> incearca dintr-un nume de fisier / folder
-            title = _title_from_files(videos, extensions, strip_year_from_show)
-        if title:
-            return Detection(TV, title=title, season=season, reason='torrent name matches "%s"' % m.group(0))
-
-    # 2. Majoritatea fisierelor video arata ca episoade
     episode_files = []
     for p in videos:
         fname = _strip_video_ext(os.path.basename(p.replace('\\', '/')), extensions)
         m = _match_any(EPISODE_PATTERNS, fname)
         if m:
             episode_files.append((p, fname, m))
+
+    # 1. Numele torrentului contine un tipar de serial
+    found = _tv_from_name(base_name, strip_year_from_show)
+    if found:
+        m, title, is_season = found
+        season = _season_from_match(m)
+        # sezon intreg: tipar de sezon (S01, Season 1, ...) sau mai multe episoade in torrent
+        is_pack = is_season or len(episode_files) >= 2
+        if not title:
+            # ex. "Season 1" -> incearca dintr-un nume de fisier / folder
+            title = _title_from_files(videos, extensions, strip_year_from_show)
+        if title:
+            return Detection(TV, title=title, season=season, is_pack=is_pack,
+                             reason='torrent name matches "%s"' % m.group(0))
+
+    # 2. Majoritatea fisierelor video arata ca episoade
     if episode_files and (len(episode_files) >= 2 or len(videos) == 1) and len(episode_files) * 2 >= len(videos):
         p, fname, m = episode_files[0]
         title = clean_title(fname[: m.start()], strip_year_from_show)
@@ -259,7 +268,8 @@ def detect(name, files=None, video_extensions=DEFAULT_VIDEO_EXTENSIONS, strip_ye
         seasons = {_season_from_match(e[2]) for e in episode_files}
         season = seasons.pop() if len(seasons) == 1 else None
         if title:
-            return Detection(TV, title=title, season=season, reason='%d episode-like video files' % len(episode_files))
+            return Detection(TV, title=title, season=season, is_pack=len(episode_files) >= 2,
+                             reason='%d episode-like video files' % len(episode_files))
 
     # 3. Altfel e film
     title, year = _movie_title(base_name, strip_year_from_show)
@@ -284,7 +294,9 @@ def build_destination(detection, movies_path, tv_path, season_subfolder=True,
         if not tv_path:
             return None
         dest = os.path.join(tv_path, detection.title)
-        if season_subfolder and detection.season is not None:
+        # folder de sezon doar pentru episoade individuale; un sezon intreg
+        # vine deja in propriul folder de torrent -> <Serial>/<folder torrent>/
+        if season_subfolder and detection.season is not None and not detection.is_pack:
             try:
                 season_dir = season_format.format(season=detection.season)
             except (KeyError, IndexError, ValueError):

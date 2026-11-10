@@ -74,6 +74,32 @@ def test_resolution_not_episode():
     assert d.kind == detector.MOVIE, d
 
 
+def test_episode_vs_season_pack():
+    tv = '/tv'
+    # un singur episod -> <Serial>/Season XX/
+    d = detector.detect('Chernobyl.S01E02.1080p.mkv', ['Chernobyl.S01E02.1080p.mkv'])
+    assert not d.is_pack, d
+    assert detector.build_destination(d, '/m', tv) == os.path.normpath('/tv/Chernobyl/Season 01')
+    # episod intr-un folder (cu .nfo) -> tot episod
+    d = detector.detect('Chernobyl.S01E02.1080p', ['Chernobyl.S01E02.1080p/ep.S01E02.mkv', 'Chernobyl.S01E02.1080p/x.nfo'])
+    assert not d.is_pack, d
+    # sezon intreg (S01) -> direct in <Serial>/, torrentul isi pastreaza folderul
+    files = ['Chernobyl.S01.1080p/Chernobyl.S01E0%d.mkv' % i for i in range(1, 6)]
+    d = detector.detect('Chernobyl.S01.1080p', files)
+    assert d.is_pack and d.season == 1, d
+    assert detector.build_destination(d, '/m', tv) == os.path.normpath('/tv/Chernobyl')
+    # "Season 1" / "Sezonul 2" -> sezon intreg
+    for name in ('Stranger Things Season 4 1080p', 'Las Fierbinti Sezonul 12'):
+        d = detector.detect(name)
+        assert d.is_pack, d
+    # pachet fara tipar in nume, doar episoade in fisiere -> sezon intreg
+    d = detector.detect('Some Pack', ['Some Pack/Show - 1x01.mkv', 'Some Pack/Show - 1x02.mkv'])
+    assert d.is_pack, d
+    # nume de episod, dar torrentul contine mai multe episoade (S01E01-E10)
+    d = detector.detect('Show.S01E01-E03', ['Show.S01E01-E03/Show.S01E01.mkv', 'Show.S01E01-E03/Show.S01E02.mkv'])
+    assert d.is_pack, d
+
+
 def test_destination():
     d = detector.detect('The.Office.US.S03E05.720p.mkv')
     dest = detector.build_destination(d, '/m', '/tv', True, 'Season {season:02d}')

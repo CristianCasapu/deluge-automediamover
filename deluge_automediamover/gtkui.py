@@ -64,7 +64,9 @@ class GtkUI(Gtk3PluginBase):
         frame.set_label_widget(Gtk.Label(label='<b>TV series</b>', use_markup=True))
         grid = Gtk.Grid(row_spacing=5, column_spacing=5, margin=5)
         frame.add(grid)
-        self.chk_season = Gtk.CheckButton(label='Create season sub-folder')
+        self.chk_season = Gtk.CheckButton(
+            label='Create season sub-folder for single episodes (full seasons keep their own folder)'
+        )
         grid.attach(self.chk_season, 0, 0, 2, 1)
         grid.attach(Gtk.Label(label='Season folder format:', xalign=0), 0, 1, 1, 1)
         self.entry_season_fmt = Gtk.Entry(hexpand=True)
@@ -135,7 +137,11 @@ class GtkUI(Gtk3PluginBase):
 
         def on_result(r):
             if r['kind'] == 'tv':
-                txt = 'TV series: "%s", season: %s' % (r['title'], r['season'] if r['season'] is not None else '-')
+                txt = 'TV series (%s): "%s", season: %s' % (
+                    'full season' if r.get('is_pack') else 'episode',
+                    r['title'],
+                    r['season'] if r['season'] is not None else '-',
+                )
             elif r['kind'] == 'movie':
                 txt = 'Movie: "%s"%s' % (r['title'], ' (%s)' % r['year'] if r['year'] else '')
             else:

@@ -4,7 +4,8 @@ Detectează automat dacă un torrent terminat este **film** sau **serial** și �
 
 | Tip | Destinație |
 |-----|-----------|
-| Serial | `<Folder seriale>/<Nume serial>/Season 01/` (subfolderul de sezon e opțional) |
+| Serial – un episod | `<Folder seriale>/<Nume serial>/Season 01/` (subfolderul de sezon e opțional) |
+| Serial – sezon întreg | `<Folder seriale>/<Nume serial>/` (torrentul își păstrează propriul folder, fără subfolder de sezon) |
 | Film | `<Folder filme>/` sau `<Folder filme>/<Titlu (An)>/` (opțional) |
 | Altceva (fără fișiere video) | nu se atinge |
 
@@ -20,6 +21,8 @@ Pe numele torrentului, apoi pe numele fișierelor video:
 - `Complete Series`, `Mini-Series`, `Integrala`
 - emisiuni zilnice: `Show.2024.03.14`
 
+Este considerat **sezon întreg** dacă numele are un tipar de sezon (`S01`, `Season 1`, `Sezonul 2`, `S01-S05`, `Complete Series`) sau dacă torrentul conține cel puțin două episoade; altfel e **episod**.
+
 Dacă nu se potrivește niciun tipar și există fișiere video, e considerat film (titlul se ia până la an / eticheta de calitate, ex. `Inception.2010.1080p.BluRay` → `Inception (2010)`). Fișierele `sample` sunt ignorate.
 
 ## Opțiuni
@@ -28,7 +31,7 @@ Dacă nu se potrivește niciun tipar și există fișiere video, e considerat fi
 |---------|----------|-----------|
 | Automatically move finished torrents | da | activează mutarea la terminarea download-ului |
 | Movies folder / TV series folder | gol | căile **de pe mașina unde rulează `deluged`**; gol = nu se mută acel tip |
-| Create season sub-folder | da | `Serial/Season 03/` |
+| Create season sub-folder for single episodes | da | doar pentru episoade: `Serial/Season 03/`; sezoanele întregi merg direct în `Serial/` |
 | Season folder format | `Season {season:02d}` | format Python, ex. `Sezonul {season}` |
 | Remove year from series name | nu | `Doctor Who (2005)` → `Doctor Who` |
 | Create "Title (Year)" sub-folder | nu | un folder per film |
@@ -45,7 +48,7 @@ Egg-ul trebuie să aibă aceeași versiune de Python ca Deluge (Deluge 2.2.0 pe 
 **Windows**
 
 ```powershell
-.\build.ps1 -Install          # construiește dist\AutoMediaMover-1.0-py3.9.egg și îl copiază în %APPDATA%\deluge\plugins
+.\build.ps1 -Install          # construiește dist\AutoMediaMover-1.1-py3.9.egg și îl copiază în %APPDATA%\deluge\plugins
 ```
 
 **Linux**

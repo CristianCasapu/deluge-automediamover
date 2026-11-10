@@ -64,7 +64,7 @@ Deluge.ux.preferences.AutoMediaMoverPage = Ext.extend(Ext.Panel, {
             name: 'season_subfolder',
             height: 22,
             hideLabel: true,
-            boxLabel: _('Create season sub-folder'),
+            boxLabel: _('Create season sub-folder for single episodes (full seasons keep their own folder)'),
         });
         this.season_format = fs.add({
             fieldLabel: _('Season folder format (e.g. "Season {season:02d}" or "Sezonul {season}")'),
@@ -181,7 +181,8 @@ Deluge.ux.preferences.AutoMediaMoverPage = Ext.extend(Ext.Panel, {
                     success: function (r) {
                         var txt;
                         if (r.kind == 'tv') {
-                            txt = _('TV series') + ': "' + r.title + '", ' + _('season') + ': ' +
+                            txt = _('TV series') + ' (' + (r.is_pack ? _('full season') : _('episode')) + '): "' +
+                                r.title + '", ' + _('season') + ': ' +
                                 (r.season === null ? '-' : r.season);
                         } else if (r.kind == 'movie') {
                             txt = _('Movie') + ': "' + r.title + '"' + (r.year ? ' (' + r.year + ')' : '');
